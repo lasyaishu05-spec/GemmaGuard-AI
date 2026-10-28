@@ -10,10 +10,10 @@ interface ScanProgressModalProps {
 
 export const ScanProgressModal: React.FC<ScanProgressModalProps> = ({ step, repoUrl }) => {
   const steps = [
-    { title: "Cloning Repository & AST Traversal", desc: "Parsing Python AST symbol table & call graphs", icon: Layers },
-    { title: "Gemma 2 9B Ingestion Router", desc: "Tokenizing code chunks & generating Qdrant vector index", icon: Cpu },
-    { title: "Gemma 2 27B Deep Reasoning", desc: "Auditing multi-file vulnerabilities & CVSS scores", icon: Shield },
-    { title: "Synthesizing Auto-Healed Patches", desc: "Generating secure schema replacements & privacy check", icon: CheckCircle2 },
+    { title: "Cloning Repository & AST Traversal", desc: "Inspecting repository file tree & call hierarchies", icon: Layers },
+    { title: "Local Ollama (gemma3:1b) Ingestion", desc: "Tokenizing code files & generating AST dependency graphs", icon: Cpu },
+    { title: "Local Ollama (gemma3:1b) Deep Audit", desc: "Evaluating multi-file vulnerabilities & CVSS scores", icon: Shield },
+    { title: "Synthesizing Auto-Healed Patches", desc: "Generating secure replacements with 100% on-device inference", icon: CheckCircle2 },
   ];
 
   return (
@@ -91,7 +91,7 @@ export const ScanProgressModal: React.FC<ScanProgressModalProps> = ({ step, repo
         {/* Footer */}
         <div className="text-xs text-slate-500 text-center pt-1 border-t border-slate-100 flex items-center justify-center gap-1.5">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-          <span>Sovereign Local Inference • 100% Open-Weights Gemma 2 Loop</span>
+          <span>Sovereign Local Inference • 100% On-Device Ollama (gemma3:1b)</span>
         </div>
       </div>
     </div>

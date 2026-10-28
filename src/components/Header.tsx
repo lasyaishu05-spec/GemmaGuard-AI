@@ -43,18 +43,17 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Right Controls */}
       <div className="flex items-center gap-2.5">
-        {/* Model Architecture Badge */}
-        <div className="hidden md:flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1 rounded-lg text-xs">
-          <span className="text-slate-500">Tiered Compute:</span>
-          <span className="font-semibold text-slate-700">Gemma 2 9B (Router)</span>
-          <span className="text-slate-300">➔</span>
-          <span className="font-semibold text-emerald-700">Gemma 2 27B (Auto-Healer)</span>
+        {/* Local Ollama Model Badge */}
+        <div className="hidden md:flex items-center gap-2 bg-emerald-50/70 border border-emerald-200 px-3 py-1 rounded-lg text-xs">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="text-slate-500 font-medium">Local LLM:</span>
+          <span className="font-semibold text-emerald-800">Ollama (gemma3:1b)</span>
         </div>
 
         {/* Sovereign Air-Gapped Pill */}
         <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg text-xs text-slate-600">
           <Lock className="w-3.5 h-3.5 text-emerald-600" />
-          <span className="font-medium">100% Private Open-Weights</span>
+          <span className="font-medium">100% Private On-Device</span>
         </div>
 
         {/* Audio Toggle */}

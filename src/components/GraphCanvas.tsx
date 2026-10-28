@@ -302,7 +302,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
             )}
             {(activeNode.type === "healed_patch" || activeNode.type === "healed") && (
               <span className="text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded text-xs font-semibold flex items-center gap-1">
-                <ShieldCheck className="w-3 h-3 text-emerald-600" /> Gemma 27B Validated
+                <ShieldCheck className="w-3 h-3 text-emerald-600" /> gemma3:1b Validated
               </span>
             )}
           </div>

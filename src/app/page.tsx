@@ -167,7 +167,7 @@ export default function Home() {
           </span>
           <span>•</span>
           <span>
-            Router: {data?.trace?.routing_engine || "Gemma 2 9B"} ➔ Reasoner: {data?.trace?.reasoning_engine || "Gemma 2 27B"}
+            Inference: {data?.trace?.routing_engine || "Local Ollama (gemma3:1b)"}
           </span>
           <span>•</span>
           <span className="text-slate-400 font-mono text-[11px]">{repoUrl.replace("https://github.com/", "")}</span>
