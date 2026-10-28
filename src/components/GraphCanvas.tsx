@@ -1,17 +1,119 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { GraphNode, DependencyLink } from "@/types";
 import { ShieldCheck, AlertTriangle, FileCode } from "lucide-react";
 
 interface GraphCanvasProps {
-  nodes: GraphNode[];
-  links: DependencyLink[];
-  activeStep: number;
+  dependenciesTraversed?: string[];
+  nodes?: GraphNode[];
+  links?: DependencyLink[];
+  isLoading?: boolean;
 }
 
-export const GraphCanvas: React.FC<GraphCanvasProps> = ({ nodes, links }) => {
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>("main");
+export const GraphCanvas: React.FC<GraphCanvasProps> = ({
+  dependenciesTraversed,
+  nodes: customNodes,
+  links: customLinks,
+  isLoading = false,
+}) => {
+  // Dynamically parse dependencies_traversed into SVG nodes and links
+  const { computedNodes, computedLinks } = useMemo(() => {
+    if (customNodes && customLinks && customNodes.length > 0) {
+      return { computedNodes: customNodes, computedLinks: customLinks };
+    }
+
+    const rawList = dependenciesTraversed || [];
+    if (rawList.length === 0) {
+      return { computedNodes: [], computedLinks: [] };
+    }
+
+    const parsedEdges: { source: string; target: string; relation: string }[] = [];
+    const nodeSet = new Set<string>();
+
+    rawList.forEach((dep) => {
+      // Support multiple formats: "A ──(REL)──> B", "A --(REL)--> B", "A -> B"
+      let src = "";
+      let tgt = "";
+      let rel = "CALLS";
+
+      if (dep.includes("──(") && dep.includes(")──>")) {
+        const parts = dep.split(/──\(|\)──>/);
+        if (parts.length >= 3) {
+          src = parts[0].trim();
+          rel = parts[1].trim();
+          tgt = parts[2].trim();
+        }
+      } else if (dep.includes("--(") && dep.includes(")-->")) {
+        const parts = dep.split(/--\(|\)-->/);
+        if (parts.length >= 3) {
+          src = parts[0].trim();
+          rel = parts[1].trim();
+          tgt = parts[2].trim();
+        }
+      } else if (dep.includes("->")) {
+        const parts = dep.split("->");
+        src = parts[0].trim();
+        tgt = parts[1].trim();
+        rel = "IMPORTS";
+      }
+
+      if (src && tgt) {
+        parsedEdges.push({ source: src, target: tgt, relation: rel });
+        nodeSet.add(src);
+        nodeSet.add(tgt);
+      }
+    });
+
+    const uniqueNodes = Array.from(nodeSet);
+    const total = uniqueNodes.length;
+
+    // Distribute node coordinates dynamically across canvas (width: 500, height: 240)
+    const generatedNodes: GraphNode[] = uniqueNodes.map((name, idx) => {
+      // Calculate layered x and y coordinates
+      const column = idx % 3;
+      const row = Math.floor(idx / 3);
+      const x = 70 + column * 180;
+      const y = 60 + row * 90;
+
+      const isHealed = name.toLowerCase().includes("heal") || name.toLowerCase().includes("patch");
+      const isTarget = name.toLowerCase().includes("eval") || name.toLowerCase().includes("sandbox") || name.toLowerCase().includes("billing") || name.toLowerCase().includes("main");
+      const isEntry = idx === 0 || name.toLowerCase().includes("route") || name.toLowerCase().includes("session");
+
+      return {
+        id: name,
+        label: name.split("/").pop() || name,
+        file: name,
+        type: isHealed
+          ? "healed"
+          : isTarget
+          ? "vulnerable"
+          : isEntry
+          ? "entrypoint"
+          : "upstream",
+        x,
+        y: Math.min(y, 200),
+      };
+    });
+
+    const generatedLinks: DependencyLink[] = parsedEdges.map((edge) => ({
+      source: edge.source,
+      target: edge.target,
+      relation: edge.relation,
+      risk: edge.relation.toLowerCase().includes("heal")
+        ? "safe"
+        : edge.relation.toLowerCase().includes("eval") || edge.relation.toLowerCase().includes("call")
+        ? "high"
+        : "medium",
+    }));
+
+    return { computedNodes: generatedNodes, computedLinks: generatedLinks };
+  }, [dependenciesTraversed, customNodes, customLinks]);
+
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+
+  const activeNode =
+    computedNodes.find((n) => n.id === selectedNodeId) || computedNodes[0] || null;
 
   const getNodeColor = (type: GraphNode["type"]) => {
     switch (type) {
@@ -38,14 +140,6 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({ nodes, links }) => {
           text: "text-indigo-800",
           border: "border-indigo-300",
         };
-      case "upstream_consumer":
-      case "upstream":
-        return {
-          stroke: "#7c3aed",
-          fill: "#ede9fe",
-          text: "text-purple-800",
-          border: "border-purple-300",
-        };
       default:
         return {
           stroke: "#64748b",
@@ -56,7 +150,18 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({ nodes, links }) => {
     }
   };
 
-  const selectedNode = nodes.find((n) => n.id === selectedNodeId) || nodes[0];
+  if (isLoading) {
+    return (
+      <div className="relative w-full rounded-xl border border-slate-200 bg-white p-4 overflow-hidden card-shadow animate-pulse">
+        <div className="h-4 w-48 bg-slate-200 rounded mb-4" />
+        <div className="h-56 w-full bg-slate-100 rounded-lg flex items-center justify-center">
+          <div className="text-xs text-slate-400 font-mono">
+            Redrawing NetworkX AST Dependency Web...
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative w-full rounded-xl border border-slate-200 bg-white p-4 overflow-hidden card-shadow">
@@ -65,28 +170,21 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({ nodes, links }) => {
         <div className="flex items-center gap-2">
           <span className="flex h-2 w-2 rounded-full bg-emerald-500" />
           <span className="text-xs font-bold text-slate-800 uppercase tracking-wide">
-            AST Dependency Topology
+            Graph-RAG AST Dependency Topology
           </span>
         </div>
         <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded font-mono">
-          Interactive Node Explorer
+          {computedNodes.length} Nodes • {computedLinks.length} Edges
         </span>
       </div>
 
       {/* SVG Canvas Area */}
       <div className="relative h-56 w-full bg-slate-50/50 rounded-lg border border-slate-100">
-        <svg className="w-full h-full" viewBox="0 0 500 240">
-          <defs>
-            <linearGradient id="linkGradGreen" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#f43f5e" stopOpacity="0.7" />
-              <stop offset="100%" stopColor="#10b981" stopOpacity="0.9" />
-            </linearGradient>
-          </defs>
-
+        <svg className="w-full h-full" viewBox="0 0 520 240">
           {/* Render Edge Lines */}
-          {links.map((link, idx) => {
-            const s = nodes.find((n) => n.id === link.source);
-            const t = nodes.find((n) => n.id === link.target);
+          {computedLinks.map((link, idx) => {
+            const s = computedNodes.find((n) => n.id === link.source);
+            const t = computedNodes.find((n) => n.id === link.target);
             if (!s || !t) return null;
 
             const isHealed = link.risk === "safe";
@@ -104,11 +202,11 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({ nodes, links }) => {
                   strokeDasharray={isHealed ? "4 2" : "none"}
                 />
 
-                {/* Animated traveling particle */}
+                {/* Animated traveling photon particle on the line */}
                 <circle r={isHealed ? "3" : "2"} fill={isHealed ? "#059669" : isHigh ? "#e11d48" : "#6366f1"}>
                   <animateMotion
                     path={`M ${s.x} ${s.y} L ${t.x} ${t.y}`}
-                    dur={`${2.2 + idx * 0.4}s`}
+                    dur={`${2.0 + idx * 0.3}s`}
                     repeatCount="indefinite"
                   />
                 </circle>
@@ -129,9 +227,9 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({ nodes, links }) => {
           })}
 
           {/* Render Nodes */}
-          {nodes.map((node) => {
+          {computedNodes.map((node) => {
             const color = getNodeColor(node.type);
-            const isSelected = selectedNodeId === node.id;
+            const isSelected = (activeNode?.id ?? "") === node.id;
             return (
               <g
                 key={node.id}
@@ -188,21 +286,21 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({ nodes, links }) => {
       </div>
 
       {/* Node Inspector Drawer */}
-      {selectedNode && (
+      {activeNode && (
         <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
           <div className="flex items-center gap-2">
             <span className="text-slate-500 font-medium">Selected Node:</span>
             <span className="font-mono text-xs bg-slate-100 text-slate-800 px-2 py-0.5 rounded border border-slate-200">
-              {selectedNode.file}
+              {activeNode.file}
             </span>
           </div>
           <div className="flex items-center gap-2">
-            {(selectedNode.type === "vulnerable_target" || selectedNode.type === "vulnerable") && (
+            {(activeNode.type === "vulnerable_target" || activeNode.type === "vulnerable") && (
               <span className="text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded text-xs font-semibold flex items-center gap-1">
                 <AlertTriangle className="w-3 h-3 text-rose-600" /> Vulnerable Target
               </span>
             )}
-            {(selectedNode.type === "healed_patch" || selectedNode.type === "healed") && (
+            {(activeNode.type === "healed_patch" || activeNode.type === "healed") && (
               <span className="text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded text-xs font-semibold flex items-center gap-1">
                 <ShieldCheck className="w-3 h-3 text-emerald-600" /> Gemma 27B Validated
               </span>

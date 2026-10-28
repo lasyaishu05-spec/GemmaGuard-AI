@@ -1,23 +1,22 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Header } from "@/components/Header";
 import { RepoSearchBar } from "@/components/RepoSearchBar";
 import { RepoOverviewStats } from "@/components/RepoOverviewStats";
 import { VulnerabilityList } from "@/components/VulnerabilityList";
 import { VulnerabilityDetail } from "@/components/VulnerabilityDetail";
 import { ScanProgressModal } from "@/components/ScanProgressModal";
-import { DEFAULT_SCAN_RESULT } from "@/lib/mockData";
-import { RepoVulnerability } from "@/types";
+import { AuditApiResponse, VulnerabilityItem } from "@/types";
 import { sound } from "@/lib/sound";
 
 export default function Home() {
-  const [repoUrl, setRepoUrl] = useState<string>(DEFAULT_SCAN_RESULT.repoUrl);
-  const [branch, setBranch] = useState<string>(DEFAULT_SCAN_RESULT.branch);
-  const [scanResult, setScanResult] = useState(DEFAULT_SCAN_RESULT);
-  const [vulnerabilities, setVulnerabilities] = useState<RepoVulnerability[]>(DEFAULT_SCAN_RESULT.vulnerabilities);
-  const [selectedVuln, setSelectedVuln] = useState<RepoVulnerability>(DEFAULT_SCAN_RESULT.vulnerabilities[0]);
-  const [isScanning, setIsScanning] = useState<boolean>(false);
+  const [repoUrl, setRepoUrl] = useState<string>("https://github.com/lasyaishu05-spec/studyMate-AI");
+  const [branch, setBranch] = useState<string>("main");
+  const [data, setData] = useState<AuditApiResponse | null>(null);
+  const [vulnerabilitiesList, setVulnerabilitiesList] = useState<VulnerabilityItem[]>([]);
+  const [selectedVuln, setSelectedVuln] = useState<VulnerabilityItem | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [scanStep, setScanStep] = useState<number>(0);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
 
@@ -26,39 +25,74 @@ export default function Home() {
     setSoundEnabled(!soundEnabled);
   };
 
-  const handleAudit = () => {
-    setIsScanning(true);
+  // Perform dynamic audit against backend API /api/audit
+  const performAudit = useCallback(async (targetUrl: string, targetBranch: string) => {
+    setIsLoading(true);
     setScanStep(1);
 
+    // Audio cues and simulated progression steps
     setTimeout(() => {
       setScanStep(2);
       sound.playBeep(580, "sine", 0.04, 0.03);
-    }, 450);
+    }, 400);
 
     setTimeout(() => {
       setScanStep(3);
       sound.playBeep(720, "sine", 0.04, 0.03);
-    }, 950);
+    }, 850);
 
     setTimeout(() => {
       setScanStep(4);
       sound.playBeep(880, "sine", 0.05, 0.04);
-    }, 1500);
+    }, 1250);
 
-    setTimeout(() => {
-      setIsScanning(false);
+    try {
+      const response = await fetch("/api/audit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ repoUrl: targetUrl, branch: targetBranch }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Audit request failed");
+      }
+
+      const payload: AuditApiResponse = await response.json();
+
+      // Enforce 1.5 second clean loading skeleton window
+      setTimeout(() => {
+        setData(payload);
+        setVulnerabilitiesList(payload.vulnerabilities_list || []);
+        setSelectedVuln(payload.vulnerabilities_list?.[0] || null);
+        setIsLoading(false);
+        setScanStep(0);
+        sound.playSuccess();
+      }, 1500);
+    } catch (err) {
+      console.error("Error executing audit:", err);
+      setIsLoading(false);
       setScanStep(0);
-      sound.playSuccess();
-    }, 1900);
+    }
+  }, []);
+
+  // Initial load
+  useEffect(() => {
+    performAudit(repoUrl, branch);
+  }, []);
+
+  // Trigger audit on button click or URL change
+  const handleRunAudit = () => {
+    performAudit(repoUrl, branch);
   };
 
+  // Toggle patch applied state
   const handleApplyPatch = (vulnId: string) => {
-    setVulnerabilities((prev) =>
+    setVulnerabilitiesList((prev) =>
       prev.map((v) => {
         if (v.id === vulnId) {
           const nextStatus = v.status === "applied" ? "unresolved" : "applied";
           const updated = { ...v, status: nextStatus as "applied" | "unresolved" };
-          if (selectedVuln.id === vulnId) {
+          if (selectedVuln?.id === vulnId) {
             setSelectedVuln(updated);
           }
           return updated;
@@ -68,7 +102,7 @@ export default function Home() {
     );
   };
 
-  const resolvedCount = vulnerabilities.filter((v) => v.status === "applied").length;
+  const resolvedCount = vulnerabilitiesList.filter((v) => v.status === "applied").length;
 
   return (
     <main className="h-screen w-screen overflow-hidden flex flex-col bg-[#f8fafc] text-slate-800 font-sans">
@@ -76,8 +110,8 @@ export default function Home() {
       <Header
         soundEnabled={soundEnabled}
         onToggleSound={handleToggleSound}
-        onRunAudit={handleAudit}
-        isScanning={isScanning}
+        onRunAudit={handleRunAudit}
+        isScanning={isLoading}
       />
 
       {/* 2. Repository Search & Configuration Bar */}
@@ -86,35 +120,38 @@ export default function Home() {
         setRepoUrl={setRepoUrl}
         branch={branch}
         setBranch={setBranch}
-        onAudit={handleAudit}
-        isScanning={isScanning}
+        onAudit={handleRunAudit}
+        isScanning={isLoading}
       />
 
-      {/* 3. At-a-Glance Overview KPI Bar */}
+      {/* 3. Dynamic Top Stats Banner wired to data?.trace?.metadata */}
       <RepoOverviewStats
-        stats={scanResult.stats}
+        data={data}
         resolvedCount={resolvedCount}
+        isLoading={isLoading}
       />
 
       {/* 4. Main 2-Column Scannable Workspace */}
       <div className="flex-1 flex overflow-hidden min-h-0 bg-white">
-        {/* Left Column: Triage List with Filters */}
+        {/* Left Column: Vulnerabilities List dynamically bound to data?.vulnerabilities_list */}
         <VulnerabilityList
-          vulnerabilities={vulnerabilities}
-          selectedId={selectedVuln.id}
+          vulnerabilitiesList={vulnerabilitiesList}
+          selectedId={selectedVuln?.id || ""}
           onSelect={(vuln) => setSelectedVuln(vuln)}
+          isLoading={isLoading}
         />
 
-        {/* Right Column: Deep Resolution Workspace */}
+        {/* Right Column: Patch solution & Graph-RAG topology */}
         <VulnerabilityDetail
           vulnerability={selectedVuln}
+          data={data}
           onApplyPatch={handleApplyPatch}
-          scanResult={scanResult}
+          isLoading={isLoading}
         />
       </div>
 
       {/* 5. Live Scan Modal during execution */}
-      {isScanning && (
+      {isLoading && (
         <ScanProgressModal
           step={scanStep}
           repoUrl={repoUrl}
@@ -129,13 +166,17 @@ export default function Home() {
             <span>GemmaGuard Core: Online</span>
           </span>
           <span>•</span>
-          <span>Open-Weights: Gemma 2 9B Router + Gemma 2 27B Reasoner</span>
+          <span>
+            Router: {data?.trace?.routing_engine || "Gemma 2 9B"} ➔ Reasoner: {data?.trace?.reasoning_engine || "Gemma 2 27B"}
+          </span>
           <span>•</span>
           <span className="text-slate-400 font-mono text-[11px]">{repoUrl.replace("https://github.com/", "")}</span>
         </div>
 
         <div className="flex items-center gap-3">
-          <span className="text-slate-600 font-medium">Graph-RAG AST: 28 Files</span>
+          <span className="text-slate-600 font-medium">
+            Scanned Files: {data?.trace?.metadata?.file_count ?? 0}
+          </span>
           <span>•</span>
           <span className="text-emerald-700 font-medium">Zero Cloud Egress • 100% Private</span>
         </div>

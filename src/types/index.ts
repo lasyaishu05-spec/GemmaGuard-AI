@@ -7,6 +7,7 @@ export interface GraphNode {
   type: "entrypoint" | "vulnerable_target" | "upstream_consumer" | "dependency" | "healed_patch" | "vulnerable" | "healed" | "upstream";
   x: number;
   y: number;
+  risk?: Severity;
   metadata?: Record<string, string | number | boolean>;
 }
 
@@ -18,25 +19,77 @@ export interface DependencyLink {
   risk: "high" | "medium" | "low" | "safe";
 }
 
-export interface RepoVulnerability {
+export interface VulnerabilityItem {
   id: string;
   title: string;
   severity: Severity;
-  cvssScore: number;
+  severity_color?: string;
+  cvss_score?: number;
+  cvssScore?: number;
   cwe: string;
-  file: string;
-  lineRange: string;
-  category: "RCE" | "SQLi" | "Path Traversal" | "Secrets" | "Auth";
-  impactSummary: string;
-  upstreamBlastRadius: string[];
-  vulnerableCode: string;
-  healedPatch: string;
-  patchExplanation: string[];
-  gemmaReasoningLogs: string[];
-  diffStats: { additions: number; deletions: number };
+  file_name?: string;
+  file?: string;
+  line_numbers?: string;
+  lineRange?: string;
+  category: "RCE" | "SQLi" | "Path Traversal" | "Secrets" | "Auth" | "Prompt Injection" | "IDOR";
+  impact?: string;
+  impactSummary?: string;
+  upstream_blast_radius?: string[];
+  upstreamBlastRadius?: string[];
+  vulnerable_code?: string;
+  vulnerableCode?: string;
+  healed_patch?: string;
+  healedPatch?: string;
+  patch_explanation?: string[];
+  patchExplanation?: string[];
+  gemma_reasoning_logs?: string[];
+  gemmaReasoningLogs?: string[];
+  diff_stats?: { additions: number; deletions: number };
+  diffStats?: { additions: number; deletions: number };
   status: "unresolved" | "applied" | "ignored";
 }
 
+export interface PatchSolution {
+  title: string;
+  file_name: string;
+  summary: string;
+  architectural_risk: string;
+  markdown_report: string;
+  vulnerable_snippet: string;
+  refactored_code: string;
+  validation_badges: string[];
+  diff_additions: number;
+  diff_deletions: number;
+}
+
+export interface AuditApiResponse {
+  repo_url: string;
+  branch: string;
+  commit_hash: string;
+  timestamp: string;
+  trace: {
+    metadata: {
+      file_count: number;
+      loc_count: number;
+      severities: {
+        total_found: number;
+        critical: number;
+        high: number;
+        medium: number;
+      };
+      auto_heal_available: number;
+      compute_cluster: string;
+    };
+    dependencies_traversed: string[];
+    routing_engine: string;
+    reasoning_engine: string;
+  };
+  vulnerabilities_list: VulnerabilityItem[];
+  patch_solution: PatchSolution;
+}
+
+// Backward-compat aliases
+export type RepoVulnerability = VulnerabilityItem;
 export interface RepositoryScanResult {
   repoUrl: string;
   branch: string;
@@ -53,59 +106,8 @@ export interface RepositoryScanResult {
     autoHealAvailable: number;
     sovereignComputeTime: string;
   };
-  vulnerabilities: RepoVulnerability[];
-  graphNodes: {
-    id: string;
-    label: string;
-    file: string;
-    type: "entrypoint" | "vulnerable" | "healed" | "upstream";
-    x: number;
-    y: number;
-    risk: Severity;
-  }[];
-  graphEdges: {
-    source: string;
-    target: string;
-    label: string;
-    risk: "high" | "medium" | "safe";
-  }[];
-  modelLineage: {
-    routingModel: string;
-    routerHardware: string;
-    routerTokens: number;
-    routerLatencyMs: number;
-    reasoningModel: string;
-    reasoningHardware: string;
-    astDepthChecked: number;
-    openWeightsLoopVerified: boolean;
-    zeroEgressSignature: string;
-  };
-}
-
-export interface VulnerabilityAudit {
-  vulnerabilityName: string;
-  severity: "Critical" | "High" | "Medium";
-  cvssScore: number;
-  cwe: string;
-  impactAnalysis: string;
-  upstreamImpact: string;
-  originalCode: string;
-  refactoredPatch: string;
-  patchExplanation: string[];
-  diffAdditions: number;
-  diffDeletions: number;
-}
-
-export interface LineagePayload {
-  routingEngine: string;
-  reasoningEngine: string;
-  sourceSnippetsReviewed: number;
-  filesScanned: string[];
-  dependenciesTraversed: string[];
-  cardA: any;
-  cardB: any;
-  cardC: any;
+  vulnerabilities: any[];
   graphNodes: GraphNode[];
-  graphLinks: DependencyLink[];
-  terminalLogs: { timestamp: string; level: "INFO" | "WARN" | "SUCCESS" | "TRACE"; message: string }[];
+  graphEdges: DependencyLink[];
+  modelLineage: any;
 }
