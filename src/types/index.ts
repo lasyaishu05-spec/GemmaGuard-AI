@@ -46,7 +46,7 @@ export interface VulnerabilityItem {
   gemmaReasoningLogs?: string[];
   diff_stats?: { additions: number; deletions: number };
   diffStats?: { additions: number; deletions: number };
-  status: "unresolved" | "applied" | "ignored";
+  status: "unresolved" | "reviewed" | "ignored";
 }
 
 export interface PatchSolution {
@@ -76,8 +76,9 @@ export interface AuditApiResponse {
         critical: number;
         high: number;
         medium: number;
+        low: number;
       };
-      auto_heal_available: number;
+      suggestions_available: number;
       compute_cluster: string;
     };
     dependencies_traversed: string[];
@@ -85,7 +86,7 @@ export interface AuditApiResponse {
     reasoning_engine: string;
   };
   vulnerabilities_list: VulnerabilityItem[];
-  patch_solution: PatchSolution;
+  patch_solution: PatchSolution | null;
 }
 
 // Backward-compat aliases
